@@ -4,9 +4,21 @@ import JSZip from 'jszip';
 import { GeneratedPlan, UserProfile } from '../types';
 import { BRAND_COLOR_PRIMARY, BRAND_COLOR_SECONDARY, PRODUCTS } from '../constants';
 
+// Ensure JSZip is attached globally for PptxGenJS to prevent "JSZip is not defined" errors
+if (typeof window !== 'undefined' && !(window as any).JSZip) {
+  (window as any).JSZip = JSZip;
+}
+
 // Clean standard initialization for Bundler environment
 export const generatePPT = async (user: UserProfile, plan: GeneratedPlan) => {
-  let pptx = new PptxGenJS();
+  // Robust initialization to handle default export inconsistencies across bundlers
+  let pptx: PptxGenJS;
+  try {
+    pptx = new PptxGenJS();
+  } catch (e) {
+    // @ts-ignore
+    pptx = new (PptxGenJS.default)();
+  }
 
   // --- 2. Data Sanitization Helpers ---
   const safeText = (text: any, fallback = "-") => {
