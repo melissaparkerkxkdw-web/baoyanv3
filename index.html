@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>好保研 Unipath - 智能保研规划系统</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        unipath: {
+                            50: '#f3f1f8',
+                            100: '#e5e0f0',
+                            200: '#d0c3e3',
+                            300: '#b39cd0',
+                            400: '#9470b9',
+                            500: '#7b4fa3', 
+                            600: '#643a85',
+                            700: '#532f6d',
+                            800: '#46285a',
+                            900: '#3b234a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PDF Lib -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .pdf-page-break {
+            page-break-before: always;
+        }
+        
+        /* Loading Spinner Styles */
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #7b4fa3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "pptxgenjs": "https://esm.sh/pptxgenjs@^4.0.1",
+    "jszip": "https://esm.sh/jszip@^3.10.1",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="min-h-screen flex flex-col text-slate-800 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 selection:bg-unipath-200">
+    
+    <!-- Initial Loading Screen (Disappears when React mounts) -->
+    <div id="root">
+        <div id="loading-screen">
+            <div class="spinner"></div>
+            <h2 class="text-xl font-bold text-slate-700">好保研 Unipath</h2>
+            <p class="text-slate-500 mt-2">系统启动中...</p>
+        </div>
+    </div>
+
+    <!-- Error Handler for File Protocol -->
+    <script>
+        if (window.location.protocol === 'file:') {
+            const root = document.getElementById('root');
+            root.innerHTML = `
+                <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; background: #fff0f0;">
+                    <h1 style="color: #e11d48; font-size: 24px; font-weight: bold; margin-bottom: 16px;">⚠️ 请使用命令行启动</h1>
+                    <p style="color: #475569; max-width: 600px; line-height: 1.6;">
+                        您正在直接双击文件，这样是无法运行的。<br>
+                        请打开终端，输入 <code>npm run dev</code> 来启动项目。
+                    </p>
+                </div>
+            `;
+        }
+    </script>
+
+    <!-- Vite Entry Point -->
+    <script type="module" src="./index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
