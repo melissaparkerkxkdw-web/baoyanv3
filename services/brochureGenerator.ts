@@ -1,3 +1,4 @@
+
 import PptxGenJS from 'pptxgenjs';
 import JSZip from 'jszip';
 import { PRODUCTS } from '../constants';
@@ -34,7 +35,7 @@ export const generateBrochure = async (productKey: 'SUNRISE' | 'HARVEST') => {
   const slide1 = pptx.addSlide();
   
   // Background Shape
-  slide1.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: '100%', h: '100%', fill: primaryColor });
+  slide1.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: '100%', h: '100%', fill: { color: primaryColor } });
   
   // Title
   slide1.addText(product.name, { 
@@ -55,11 +56,11 @@ export const generateBrochure = async (productKey: 'SUNRISE' | 'HARVEST') => {
   const slide2 = pptx.addSlide();
   
   // Header Strip
-  slide2.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: '100%', h: 1.0, fill: primaryColor });
+  slide2.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: '100%', h: 1.0, fill: { color: primaryColor } });
   slide2.addText(product.name + " - 核心权益", { x: 0.5, y: 0.25, fontSize: 24, color: white, bold: true, fontFace: 'Microsoft YaHei' });
 
   // Description Box
-  slide2.addShape(pptx.ShapeType.rect, { x: 0.5, y: 1.5, w: 12.3, h: 2.0, fill: lightBg });
+  slide2.addShape(pptx.ShapeType.rect, { x: 0.5, y: 1.5, w: 12.3, h: 2.0, fill: { color: lightBg } });
   slide2.addText('项目介绍', { x: 0.7, y: 1.7, fontSize: 14, bold: true, color: primaryColor, fontFace: 'Microsoft YaHei' });
   slide2.addText(product.description, { x: 0.7, y: 2.1, w: 11.8, fontSize: 14, color: darkText, fontFace: 'Microsoft YaHei' });
 
