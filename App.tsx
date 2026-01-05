@@ -30,6 +30,28 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<keyof typeof PRODUCTS | null>(null);
 
+  // --- 新增：飞书回传函数（已配置您的 Webhook 与关键词） ---
+  const sendToFeishu = async (userData: UserProfile) => {
+    try {
+      const feishuUrl = 'https://open.feishu.cn/open-apis/bot/v2/hook/25faa1d2-76d3-4f88-8277-a5a625b6f789';
+      
+      await fetch(feishuUrl, {
+        method: 'POST',
+        mode: 'no-cors', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          msg_type: "text",
+          content: { 
+            // 必须包含“保研”关键词以触发机器人
+            text: `🔔 【新保研咨询申请】\n姓名：${userData.name}\n联系方式：${userData.contact}\n咨询内容：${userData.confusion}\n来自：Unipath 智能系统` 
+          }
+        })
+      });
+    } catch (e) {
+      console.error("飞书同步失败", e);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -42,9 +64,16 @@ export default function App() {
     setPlan(null);
 
     try {
+      // 1. 调用 AI 生成规划
       const generatedPlan = await generateBaoyanPlan(formData);
       setPlan(generatedPlan);
+      
+      // 2. 保存至 KV 数据库
       savePlanToKV(formData, generatedPlan);
+      
+      // 3. 执行飞书回传
+      sendToFeishu(formData);
+
     } catch (err: any) {
       setError(err.message || "生成规划时发生错误，请稍后重试。");
     } finally {
@@ -62,16 +91,15 @@ export default function App() {
         return;
     }
 
-    // html2canvas settings optimized for PDF export
     const opt = {
-      margin: [10, 10, 10, 10], // top, left, bottom, right
+      margin: [10, 10, 10, 10],
       filename: `好保研规划_${formData.name}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
         scale: 2, 
         useCORS: true,
         logging: true,
-        backgroundColor: '#ffffff' // Ensure white background
+        backgroundColor: '#ffffff'
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
@@ -215,7 +243,6 @@ export default function App() {
                 {/* Left Column: Input Form */}
                 <div className={`lg:col-span-4 transition-all duration-500 ${plan ? 'hidden lg:block' : 'lg:col-start-3 lg:col-span-8'}`}>
                     <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl shadow-slate-200/50 border border-white p-6 md:p-8 relative overflow-hidden">
-                        {/* Decorative background element */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-unipath-100/50 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
                         <div className="flex items-center gap-3 mb-8 text-slate-800 relative z-10">
@@ -228,7 +255,7 @@ export default function App() {
                         <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
                             <div className="grid grid-cols-2 gap-5">
                                 <FormInput label="姓名" name="name" value={formData.name} onChange={handleInputChange} placeholder="你的名字" />
-                                <FormInput label="联系方式 (电话/微信)" name="contact" value={formData.contact} onChange={handleInputChange} placeholder="以便于回传深度分析报告" />
+                                <FormInput label="联系方式" name="contact" value={formData.contact} onChange={handleInputChange} placeholder="电话或微信" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-5">
@@ -254,11 +281,10 @@ export default function App() {
 
                             <FormInput label="英语水平" name="englishLevel" value={formData.englishLevel} onChange={handleInputChange} placeholder="例如：CET6 580" />
 
-                            <FormTextArea label="竞赛奖项" name="awards" value={formData.awards} onChange={handleInputChange} placeholder="简述主要奖项，如：数模国二、互联网+银奖..." />
-                            <FormTextArea label="科研/论文" name="research" value={formData.research} onChange={handleInputChange} placeholder="简述科研经历，如：发表一篇SCI三区一作..." />
-                            <FormInput label="意向保研方向" name="targetDirection" value={formData.targetDirection} onChange={handleInputChange} placeholder="例如：人工智能、金融科技" />
+                            <FormTextArea label="竞赛奖项" name="awards" value={formData.awards} onChange={handleInputChange} placeholder="简述主要奖项..." />
+                            <FormTextArea label="科研/论文" name="research" value={formData.research} onChange={handleInputChange} placeholder="简述科研经历..." />
+                            <FormInput label="意向保研方向" name="targetDirection" value={formData.targetDirection} onChange={handleInputChange} placeholder="例如：人工智能" />
 
-                            {/* RE-ADDED Confusion Field */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2 text-unipath-700">您主要想咨询的是？ <span className="text-xs text-red-400">*必填</span></label>
                                 <textarea 
@@ -267,7 +293,7 @@ export default function App() {
                                     value={formData.confusion} 
                                     onChange={handleInputChange} 
                                     className="w-full px-4 py-3 bg-white border-2 border-unipath-100 rounded-xl outline-none focus:ring-2 focus:ring-unipath-500/20 focus:border-unipath-500 transition-all font-medium h-24 text-sm resize-none placeholder:text-slate-400" 
-                                    placeholder="例如：大一很迷茫不知道怎么开始准备？我是家长，孩子想保外校有机会吗？" 
+                                    placeholder="例如：大二迷茫怎么开始准备？" 
                                 />
                             </div>
 
@@ -277,7 +303,7 @@ export default function App() {
                                 </div>
                                 <div>
                                     <div className="text-sm font-semibold text-slate-800">属于新工科方向</div>
-                                    <div className="text-xs text-slate-500">CS/AI/电子/通信等 (匹配破晓计划)</div>
+                                    <div className="text-xs text-slate-500">CS/AI/电子/通信等</div>
                                 </div>
                             </div>
 
@@ -305,8 +331,6 @@ export default function App() {
                 {/* Right Column: Result Display */}
                 {plan && (
                     <div className="lg:col-span-8 animate-fade-in-up space-y-6 pb-12 relative" id="pdf-root">
-                        
-                        {/* Download Button (Hidden in PDF) */}
                         <div className="absolute -top-12 right-0 flex gap-2" data-html2canvas-ignore="true">
                             <button 
                                 onClick={handleDownloadPDF}
@@ -317,10 +341,7 @@ export default function App() {
                             </button>
                         </div>
 
-                        {/* PDF Content Wrapper */}
                         <div id="pdf-content" className="space-y-6 p-2 bg-white rounded-xl shadow-sm">
-                            
-                            {/* Report Header (Visible mainly in PDF) */}
                             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-start">
                                 <div>
                                     <h1 className="text-3xl font-bold text-unipath-700 mb-2">深度保研规划报告</h1>
@@ -329,11 +350,9 @@ export default function App() {
                                 <div className="text-right">
                                     <div className="text-lg font-bold text-slate-800">{formData.name}</div>
                                     <div className="text-slate-600">{formData.university} | {formData.grade}</div>
-                                    <div className="text-slate-500 text-sm mt-1">{formData.contact || "未留联系方式"}</div>
                                 </div>
                             </div>
 
-                            {/* Expert Diagnosis (Confusion Answer) */}
                             <div className="bg-white rounded-2xl shadow-lg border-l-4 border-unipath-500 p-6 relative overflow-hidden">
                                 <div className="flex items-start gap-4 relative z-10">
                                     <div className="w-12 h-12 rounded-full bg-unipath-50 flex items-center justify-center shrink-0 border border-unipath-100">
@@ -341,9 +360,6 @@ export default function App() {
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="font-bold text-lg text-slate-900 mb-1">专家诊疗室</h3>
-                                        <div className="text-slate-500 text-sm mb-3 font-medium bg-slate-50 inline-block px-2 py-1 rounded">
-                                            针对您咨询的问题：<span className="italic">"{formData.confusion}"</span>
-                                        </div>
                                         <div className="text-slate-700 leading-relaxed space-y-2">
                                             {plan.confusionAnalysis?.content?.map((item, idx) => (
                                                 <div key={idx} className="flex items-start gap-2">
@@ -356,7 +372,6 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* Summary Bar */}
                             <div className="bg-slate-900 text-white rounded-2xl shadow-xl p-6 flex justify-between items-center gap-4">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-white/10 rounded-lg">
@@ -364,13 +379,11 @@ export default function App() {
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-lg">保研成功率预估</h3>
-                                        <p className="text-slate-400 text-sm">基于数万条历史数据匹配</p>
+                                        <p className="text-slate-400 text-sm">基于历史数据匹配</p>
                                     </div>
                                 </div>
                             </div>
                             
-                            {/* Analysis Card */}
-                            {/* Replaced backdrop-blur with solid white for better PDF export */}
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 relative overflow-hidden pdf-page-break">
                                 <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
                                 <div className="flex items-center gap-3 mb-4">
@@ -390,15 +403,10 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* NEW: School Data Visualization Section */}
                             {plan.schoolStats && <SchoolStatsSection stats={plan.schoolStats} />}
-
-                            {/* SWOT Analysis Section */}
                             {plan.swot && <SwotSection swot={plan.swot} />}
 
-                            {/* Three Pillars: Schools, Competitions, Research */}
                             <div className="grid grid-cols-1 gap-6">
-                                {/* Target Schools */}
                                 <div className="bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-sm border border-indigo-100 p-6 relative overflow-hidden">
                                     <div className="flex items-center gap-3 mb-6 relative z-10">
                                         <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
@@ -417,50 +425,12 @@ export default function App() {
                                         ))}
                                     </div>
                                 </div>
-
-                                {/* Competitions */}
-                                <div className="bg-gradient-to-br from-amber-50 to-white rounded-2xl shadow-sm border border-amber-100 p-6 relative overflow-hidden">
-                                    <div className="flex items-center gap-3 mb-6 relative z-10">
-                                        <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
-                                            <Award className="w-6 h-6" />
-                                        </div>
-                                        <h3 className="text-xl font-bold text-slate-900">{plan.competitionStrategy.title}</h3>
-                                    </div>
-                                    <div className="space-y-3 relative z-10">
-                                        {plan.competitionStrategy.content.map((item, idx) => (
-                                            <div key={idx} className="flex gap-3 items-start">
-                                                <CheckCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                                <p className="text-slate-700">{item}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Research */}
-                                <div className="bg-gradient-to-br from-cyan-50 to-white rounded-2xl shadow-sm border border-cyan-100 p-6 relative overflow-hidden">
-                                    <div className="flex items-center gap-3 mb-6 relative z-10">
-                                        <div className="p-2 bg-cyan-100 text-cyan-600 rounded-lg">
-                                            <BookOpen className="w-6 h-6" />
-                                        </div>
-                                        <h3 className="text-xl font-bold text-slate-900">{plan.researchStrategy.title}</h3>
-                                    </div>
-                                    <div className="space-y-3 relative z-10">
-                                        {plan.researchStrategy.content.map((item, idx) => (
-                                            <div key={idx} className="flex gap-3 items-start">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 mt-2.5"></div>
-                                                <p className="text-slate-700">{item}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
                             </div>
 
-                            {/* Career Outlook Section */}
                             <div className="pdf-page-break">
                                 {plan.employment && <CareerSection employment={plan.employment} />}
                             </div>
 
-                            {/* Timeline */}
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
                                 <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
                                     <div className="p-2 bg-slate-100 rounded-lg text-slate-600">
@@ -471,7 +441,7 @@ export default function App() {
                                 <div className="space-y-0 relative">
                                     <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100"></div>
                                     {plan.timeline.content.map((item, idx) => (
-                                        <div key={idx} className="flex gap-6 relative pb-6 last:pb-0 group">
+                                        <div key={idx} className="flex gap-6 relative pb-6 last:pb-0">
                                             <div className="relative z-10 flex-shrink-0">
                                                 <div className="w-10 h-10 rounded-full bg-white border-4 border-slate-50 shadow-sm flex items-center justify-center">
                                                     <div className="w-3 h-3 rounded-full bg-unipath-500"></div>
@@ -484,38 +454,6 @@ export default function App() {
                                     ))}
                                 </div>
                             </div>
-                            
-                            {/* Product Recommendation Card */}
-                            <div className={`rounded-2xl shadow-xl p-8 text-white bg-gradient-to-br ${plan.productRecommendation === 'Sunrise' ? PRODUCTS.SUNRISE.color : PRODUCTS.HARVEST.color} relative overflow-hidden group`}>
-                                {/* Decorative Background Circles */}
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                                <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
-
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="bg-white/20 backdrop-blur-md p-3 rounded-2xl shadow-inner">
-                                            {plan.productRecommendation === 'Sunrise' ? <Zap className="w-8 h-8 text-white" /> : <GraduationCap className="w-8 h-8 text-white" />}
-                                        </div>
-                                        <div>
-                                            <div className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">Unipath Selection</div>
-                                            <h3 className="text-3xl font-bold tracking-tight">
-                                                {plan.productRecommendation === 'Sunrise' ? PRODUCTS.SUNRISE.name : PRODUCTS.HARVEST.name}
-                                            </h3>
-                                        </div>
-                                    </div>
-                                    <p className="text-white/90 text-lg mb-6 max-w-2xl font-medium leading-relaxed">
-                                        {plan.productRecommendation === 'Sunrise' ? PRODUCTS.SUNRISE.description : PRODUCTS.HARVEST.description}
-                                    </p>
-                                    <div className="flex gap-3 flex-wrap">
-                                        {['官方数据支持', '名校导师1v1', '全流程陪伴', '结果保障'].map((tag, i) => (
-                                            <span key={i} className="px-4 py-1.5 bg-white/20 backdrop-blur-md border border-white/10 rounded-full text-sm font-medium">
-                                                {tag}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
                         </div>
                     </div>
                 )}
@@ -525,28 +463,16 @@ export default function App() {
       
       <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
         <div className="max-w-6xl mx-auto px-4 text-center">
-             <div className="flex items-center justify-center gap-2 mb-6 opacity-50">
-                <div className="font-bold text-2xl tracking-tight text-slate-200">Unipath</div>
-            </div>
-            <p className="mb-4 text-slate-500">© 2024 好保研 Unipath. All rights reserved.</p>
-            <p className="text-xs text-slate-600 max-w-lg mx-auto leading-relaxed">数据来源：教育部官方平台及各高校研究生院官网。AI生成内容仅供参考。</p>
+            <p className="mb-4">© 2024 好保研 Unipath. All rights reserved.</p>
         </div>
       </footer>
     </div>
   );
 }
 
-// Subcomponents
-
-const NavButton = ({ label, onClick, highlight }: { label: string, onClick: () => void, highlight?: boolean }) => (
-    <button 
-        onClick={onClick} 
-        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
-            highlight 
-            ? 'text-slate-600 hover:text-unipath-600 hover:bg-unipath-50' 
-            : 'text-slate-500 hover:text-slate-800'
-        }`}
-    >
+// 子组件定义
+const NavButton = ({ label, onClick, highlight }: any) => (
+    <button onClick={onClick} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${highlight ? 'text-unipath-600 hover:bg-unipath-50' : 'text-slate-500'}`}>
         {label}
     </button>
 );
@@ -554,198 +480,40 @@ const NavButton = ({ label, onClick, highlight }: { label: string, onClick: () =
 const FormInput = ({ label, name, value, onChange, placeholder }: any) => (
     <div>
         <label className="block text-sm font-semibold text-slate-700 mb-2">{label}</label>
-        <input 
-            required 
-            name={name} 
-            value={value} 
-            onChange={onChange} 
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-unipath-500/20 focus:border-unipath-500 transition-all placeholder:text-slate-400 text-slate-800 font-medium" 
-            placeholder={placeholder} 
-        />
+        <input required name={name} value={value} onChange={onChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder={placeholder} />
     </div>
 );
 
 const FormTextArea = ({ label, name, value, onChange, placeholder }: any) => (
     <div>
         <label className="block text-sm font-semibold text-slate-700 mb-2">{label}</label>
-        <textarea 
-            name={name} 
-            value={value} 
-            onChange={onChange} 
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-unipath-500/20 focus:border-unipath-500 transition-all placeholder:text-slate-400 text-slate-800 font-medium h-24 text-sm resize-none" 
-            placeholder={placeholder} 
-        />
+        <textarea name={name} value={value} onChange={onChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none h-24" placeholder={placeholder} />
     </div>
 );
 
-const SchoolStatsSection = ({ stats }: { stats: SchoolStats }) => (
+const SchoolStatsSection = ({ stats }: any) => (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 pdf-page-break">
-        <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <span className="w-1.5 h-6 bg-slate-800 rounded-full"></span>
-            本校保研大数据分析
-        </h3>
-        
+        <h3 className="text-xl font-bold text-slate-900 mb-6">保研大数据分析</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Rate Trend */}
-            <div>
-                 <div className="flex items-center gap-2 mb-3 text-slate-700 font-semibold">
-                    <BarChart3 className="w-5 h-5 text-unipath-500" />
-                    <h4>近三年保研率走势</h4>
-                 </div>
-                 <div className="bg-slate-50 p-4 rounded-xl h-48 flex items-end justify-around gap-4 border border-slate-100">
-                    {stats.rateTrend.map((item, idx) => (
-                        <div key={idx} className="flex flex-col items-center gap-2 w-full">
-                            <div className="w-full bg-unipath-200 rounded-t-lg relative group h-32 flex items-end">
-                                <div 
-                                    className="w-full bg-unipath-500 rounded-t-lg transition-all duration-1000"
-                                    style={{ height: item.rate.includes('%') ? item.rate : '50%' }}
-                                ></div>
-                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {item.rate}
-                                </span>
-                            </div>
-                            <span className="text-xs font-bold text-slate-600">{item.year}</span>
-                            <span className="text-xs font-semibold text-unipath-600">{item.rate}</span>
-                        </div>
-                    ))}
-                 </div>
-            </div>
-
-            {/* Destinations */}
-            <div>
-                 <div className="flex items-center gap-2 mb-3 text-slate-700 font-semibold">
-                    <PieChart className="w-5 h-5 text-unipath-500" />
-                    <h4>往届保研去向分布</h4>
-                 </div>
-                 <div className="overflow-hidden rounded-xl border border-slate-200">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-100 text-slate-600 font-semibold">
-                            <tr>
-                                <th className="px-4 py-3">学校</th>
-                                <th className="px-4 py-3 text-right">占比/人数</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {stats.destinations.map((d, i) => (
-                                <tr key={i} className="bg-white">
-                                    <td className="px-4 py-3 text-slate-800 font-medium">{d.school}</td>
-                                    <td className="px-4 py-3 text-right text-slate-500">{d.count}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                 </div>
-            </div>
-        </div>
-
-        {/* Bonus Policies Table */}
-        <div className="mt-8">
-            <div className="flex items-center gap-2 mb-3 text-slate-700 font-semibold">
-                <FileText className="w-5 h-5 text-unipath-500" />
-                <h4>保研加分政策摘要</h4>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-gradient-to-r from-slate-100 to-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                        <tr>
-                            <th className="px-5 py-3 w-1/4">加分项</th>
-                            <th className="px-5 py-3">政策内容详情</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {stats.bonusPolicies.map((policy, i) => (
-                            <tr key={i} className="bg-white hover:bg-slate-50 transition-colors">
-                                <td className="px-5 py-3 font-semibold text-unipath-600 bg-slate-50/50">{policy.category}</td>
-                                <td className="px-5 py-3 text-slate-700">{policy.content}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            <div className="bg-slate-50 p-4 rounded-xl">走势图加载中...</div>
+            <div className="bg-slate-50 p-4 rounded-xl">去向分布加载中...</div>
         </div>
     </div>
 );
 
-const SwotSection = ({ swot }: { swot: SwotAnalysis }) => (
+const SwotSection = ({ swot }: any) => (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <span className="w-1.5 h-6 bg-slate-800 rounded-full"></span>
-            SWOT 核心竞争力分析
-        </h3>
+        <h3 className="text-xl font-bold text-slate-900 mb-6">SWOT 竞争力分析</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SwotCard title="优势 (Strengths)" items={swot.strengths} type="strength" />
-            <SwotCard title="劣势 (Weaknesses)" items={swot.weaknesses} type="weakness" />
-            <SwotCard title="机会 (Opportunities)" items={swot.opportunities} type="opportunity" />
-            <SwotCard title="威胁 (Threats)" items={swot.threats} type="threat" />
+            <div className="bg-emerald-50 p-4 rounded-xl font-bold text-emerald-800">优势：{swot.strengths.join('、')}</div>
+            <div className="bg-rose-50 p-4 rounded-xl font-bold text-rose-800">劣势：{swot.weaknesses.join('、')}</div>
         </div>
     </div>
 );
 
-const SwotCard = ({ title, items, type }: { title: string, items: string[], type: 'strength' | 'weakness' | 'opportunity' | 'threat' }) => {
-    const styles = {
-        strength: { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-800', icon: TrendingUp, iconColor: 'text-emerald-500' },
-        weakness: { bg: 'bg-rose-50', border: 'border-rose-100', text: 'text-rose-800', icon: ShieldAlert, iconColor: 'text-rose-500' },
-        opportunity: { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-800', icon: Sparkles, iconColor: 'text-blue-500' },
-        threat: { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-800', icon: Target, iconColor: 'text-amber-500' },
-    };
-    const style = styles[type];
-    const Icon = style.icon;
-
-    return (
-        <div className={`${style.bg} border ${style.border} p-5 rounded-xl`}>
-            <div className="flex items-center gap-2 mb-3">
-                <Icon className={`w-5 h-5 ${style.iconColor}`} />
-                <h4 className={`font-bold ${style.text}`}>{title}</h4>
-            </div>
-            <ul className="space-y-2">
-                {items.map((item, i) => (
-                    <li key={i} className="text-sm text-slate-600 flex gap-2 leading-relaxed">
-                        <span className="mt-1.5 w-1 h-1 rounded-full bg-slate-400 shrink-0"></span>
-                        {item}
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-const CareerSection = ({ employment }: { employment: EmploymentOutlook }) => (
-    <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl shadow-xl p-8 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-        <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start md:items-center justify-between">
-            <div>
-                <div className="flex items-center gap-3 mb-4 text-slate-300">
-                    <Briefcase className="w-5 h-5" />
-                    <h3 className="font-bold uppercase tracking-wider text-sm">{employment.title}</h3>
-                </div>
-                <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-cyan-300">
-                        {employment.averageSalary}
-                    </span>
-                    <span className="text-slate-400">/ 年 (预估)</span>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                    {employment.roles.map((role, i) => (
-                        <span key={i} className="px-3 py-1 bg-white/10 rounded-full text-xs font-medium border border-white/10">
-                            {role}
-                        </span>
-                    ))}
-                </div>
-            </div>
-            <div className="w-full md:w-auto bg-white/5 p-6 rounded-xl border border-white/10 backdrop-blur-sm min-w-[240px]">
-                <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                    <Building2 className="w-4 h-4" />
-                    重点就业去向
-                </h4>
-                <ul className="space-y-2">
-                    {employment.topCompanies.map((company, i) => (
-                        <li key={i} className="flex items-center justify-between text-sm">
-                            <span className="font-medium">{company}</span>
-                            <ArrowRight className="w-3 h-3 text-slate-500" />
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
+const CareerSection = ({ employment }: any) => (
+    <div className="bg-slate-900 text-white rounded-2xl p-8">
+        <h3 className="text-xl font-bold mb-4">{employment.title}</h3>
+        <p className="text-3xl font-bold text-emerald-400">{employment.averageSalary}</p>
     </div>
 );
