@@ -1,10 +1,16 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
 import { UserProfile, GeneratedPlan } from '../types';
+import { DEEPSEEK_API_URL } from '../constants';
 
 export const generateBaoyanPlan = async (user: UserProfile): Promise<GeneratedPlan> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // 1. Validate API Key
+  const apiKey = process.env.API_KEY;
 
+  if (!apiKey || apiKey.trim() === "" || apiKey.includes("API_KEY")) {
+    throw new Error("配置错误：未检测到 API Key。请在 Netlify 的 'Environment variables' 中添加名为 API_KEY 的变量，并填入您的 DeepSeek Key。");
+  }
+
+  // 2. Define Prompts
   const systemPrompt = `
     你是一位顶尖的保研规划专家，来自“好保研 (Unipath)”团队。
     你的任务是为学生生成一份详细的、商业级别的保研规划方案。
@@ -16,7 +22,36 @@ export const generateBaoyanPlan = async (user: UserProfile): Promise<GeneratedPl
     4. 重点回答用户的“咨询问题”。
     5. 若学生为新工科方向（计算机/AI/电子等），productRecommendation 字段请填 "Sunrise"；否则填 "Harvest"。
     
-    请严格按照 JSON 格式输出。
+    【重要】必须只输出标准的 JSON 格式，不要包含 Markdown 标记（如 \`\`\`json）。
+    
+    目标 JSON 结构如下：
+    {
+      "confusionAnalysis": { "title": "专家诊断", "content": ["点1", "点2"] },
+      "summary": "核心综述字符串",
+      "schoolStats": {
+        "rateTrend": [{ "year": "2021", "rate": "15%" }, { "year": "2022", "rate": "16%" }],
+        "bonusPolicies": [{ "category": "竞赛", "content": "国一+3分" }],
+        "destinations": [{ "school": "清华大学", "count": "12人" }]
+      },
+      "swot": {
+        "strengths": ["优势1", "优势2"],
+        "weaknesses": ["劣势1"],
+        "opportunities": ["机会1"],
+        "threats": ["威胁1"]
+      },
+      "analysis": { "title": "背景分析", "content": ["分析1", "分析2"] },
+      "targetSchools": { "title": "目标院校", "content": ["学校A", "学校B"] },
+      "competitionStrategy": { "title": "竞赛规划", "content": ["建议1"] },
+      "researchStrategy": { "title": "科研规划", "content": ["建议1"] },
+      "employment": {
+        "title": "就业展望",
+        "averageSalary": "30w-40w",
+        "topCompanies": ["公司A"],
+        "roles": ["岗位A"]
+      },
+      "timeline": { "title": "时间轴", "content": ["3月：xxx", "4月：xxx"] },
+      "productRecommendation": "Sunrise" 
+    }
   `;
 
   const userPrompt = `
@@ -34,108 +69,52 @@ export const generateBaoyanPlan = async (user: UserProfile): Promise<GeneratedPl
     咨询问题（重点回答）：${user.confusion}
     是否新工科：${user.isNewEngineering ? '是' : '否'}
     
-    请根据以上信息，生成详细保研规划。
+    请根据以上信息，生成详细保研规划。请直接返回 JSON 数据。
   `;
 
-  const planSectionSchema = {
-    type: Type.OBJECT,
-    properties: {
-      title: { type: Type.STRING },
-      content: { type: Type.ARRAY, items: { type: Type.STRING } }
-    },
-    required: ['title', 'content']
-  };
-
-  const schema = {
-    type: Type.OBJECT,
-    properties: {
-      confusionAnalysis: planSectionSchema,
-      summary: { type: Type.STRING },
-      schoolStats: {
-        type: Type.OBJECT,
-        properties: {
-            rateTrend: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: { year: { type: Type.STRING }, rate: { type: Type.STRING } },
-                    required: ['year', 'rate']
-                }
-            },
-            bonusPolicies: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: { category: { type: Type.STRING }, content: { type: Type.STRING } },
-                    required: ['category', 'content']
-                }
-            },
-            destinations: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: { school: { type: Type.STRING }, count: { type: Type.STRING } },
-                    required: ['school', 'count']
-                }
-            }
-        },
-        required: ['rateTrend', 'bonusPolicies', 'destinations']
-      },
-      swot: {
-        type: Type.OBJECT,
-        properties: {
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-            weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-            opportunities: { type: Type.ARRAY, items: { type: Type.STRING } },
-            threats: { type: Type.ARRAY, items: { type: Type.STRING } }
-        },
-        required: ['strengths', 'weaknesses', 'opportunities', 'threats']
-      },
-      analysis: planSectionSchema,
-      targetSchools: planSectionSchema,
-      competitionStrategy: planSectionSchema,
-      researchStrategy: planSectionSchema,
-      employment: {
-        type: Type.OBJECT,
-        properties: {
-            title: { type: Type.STRING },
-            averageSalary: { type: Type.STRING },
-            topCompanies: { type: Type.ARRAY, items: { type: Type.STRING } },
-            roles: { type: Type.ARRAY, items: { type: Type.STRING } }
-        },
-        required: ['title', 'averageSalary', 'topCompanies', 'roles']
-      },
-      timeline: planSectionSchema,
-      crossMajor: planSectionSchema,
-      productRecommendation: { type: Type.STRING, enum: ['Sunrise', 'Harvest'] }
-    },
-    required: [
-        'confusionAnalysis', 'summary', 'schoolStats', 'swot', 'analysis', 
-        'targetSchools', 'competitionStrategy', 'researchStrategy', 
-        'employment', 'timeline', 'productRecommendation'
-    ]
-  };
-
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: userPrompt,
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      }
+    // 3. Call DeepSeek API (OpenAI Compatible Interface)
+    const response = await fetch(DEEPSEEK_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat", // V3
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 1.3, // DeepSeek Creative Temperature
+        response_format: { type: "json_object" } // Force JSON mode
+      })
     });
 
-    const text = response.text;
-    if (!text) {
-      throw new Error("AI生成的内容为空");
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`API请求失败: ${response.status} - ${errText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error("AI未返回有效内容");
     }
     
-    return JSON.parse(text) as GeneratedPlan;
+    // Parse JSON
+    return JSON.parse(content) as GeneratedPlan;
 
   } catch (error: any) {
-    console.error("Gemini API Call Failed:", error);
-    throw new Error(error.message || "生成规划时发生未知错误");
+    console.error("DeepSeek API Call Failed:", error);
+    // User friendly error mapping
+    if (error.message.includes("401")) {
+        throw new Error("API Key 无效或已过期，请检查 Netlify 配置。");
+    }
+    if (error.message.includes("402")) {
+        throw new Error("API Key 余额不足，请充值。");
+    }
+    throw new Error(error.message || "生成规划时发生未知错误，请检查网络");
   }
 };
